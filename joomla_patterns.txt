@@ -1,0 +1,10 @@
+# Joomla-specific shell patterns
+/components/com_wrapper/wrapper.php?cmd=
+/modules/mod_wrapper/wrapper.php?eval=
+index.php?option=com_&task=
+/administrator/components/com_/admin.php?cmd=
+/plugins/system/plugin.php?eval=
+/libraries/joomla/application/web.php?system=
+/templates/beez/index.php?base64_decode=
+configuration.php.bak
+.htaccess with php_value auto_prepend_file

@@ -1,0 +1,9 @@
+# WordPress-specific shell patterns
+/wp-content/themes/twenty*/404.php?cmd=
+/wp-content/uploads/shell.php
+/wp-content/plugins/hello.php?eval=
+/wp-includes/js/jquery/shell.js
+/wp-config.php.bak
+/wp-admin/admin-ajax.php?action=shell
+/wp-admin/js/common.js?base64_decode=
+/wp-content/plugins/akismet/akismet.php?system=

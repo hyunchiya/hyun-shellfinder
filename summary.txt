@@ -1,0 +1,10 @@
+=== SHELLFINDER SCAN SUMMARY ===
+Scan Date: 2025-12-16 00:35:53
+Duration: 2m26.0599753s
+Total Domains: 53
+Completed: 53
+
+Detailed Results:
+=================
+
+Detailed results from database are unavailable (CGO disabled or SaveToDB is false).

@@ -93,6 +93,11 @@ var (
 	mu                sync.Mutex
 	resultsChan       = make(chan ScanResult, 1000)
 	totalScanned      = 0
+	shellFilenames    []string
+	pathsWP           []string
+	pathsJoomla       []string
+	pathsGeneral      []string
+	shellSignatures   []string
 )
 
 func main() {
@@ -132,6 +137,21 @@ func main() {
 	printBanner()
 
 	loadWordlists()
+
+	if err := loadShellFilenames("shell_names.txt"); err != nil {
+		log.Printf("⚠️ Warning: shell_names.txt not found, using default list.")
+		shellFilenames = []string{"shell.php", "wso.php", "mini.php", "upload.php", "alfa.php"}
+	}
+
+	if err := loadPaths("paths.txt"); err != nil {
+		pathsWP = []string{"/wp-content/uploads/", "/wp-includes/"}
+		pathsJoomla = []string{"/images/", "/components/"}
+		pathsGeneral = []string{"/uploads/", "/assets/"}
+	}
+
+	if err := loadSignatures("signatures.txt"); err != nil {
+		shellSignatures = []string{"type=\"password\"", "c99shell", "wso 2.", "r57shell", "hacked by"}
+	}
 
 	initHTTPClient(*rateLimit)
 
@@ -194,6 +214,105 @@ func main() {
 		duration := time.Since(startTime)
 		generateSummaryReport(duration, len(domains))
 	}
+}
+
+func loadShellFilenames(filename string) error {
+	file, err := os.Open(filename)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line != "" && !strings.HasPrefix(line, "#") {
+			shellFilenames = append(shellFilenames, line)
+		}
+	}
+	return scanner.Err()
+}
+
+func loadSignatures(filename string) error {
+	file, err := os.Open(filename)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line != "" {
+			shellSignatures = append(shellSignatures, line)
+		}
+	}
+	return scanner.Err()
+}
+
+func checkStealthShell(url string) (string, bool) {
+	params := []string{"cmd", "c", "command", "x", "pass", "pwd"}
+	payloads := []string{"id", "whoami", "uname -a"}
+
+	for _, param := range params {
+		for _, payload := range payloads {
+			target := fmt.Sprintf("%s?%s=%s", url, param, payload)
+
+			req, _ := http.NewRequest("GET", target, nil)
+			req.Header.Set("User-Agent", config.UserAgent)
+
+			resp, err := httpClient.Do(req)
+			if err != nil {
+				continue
+			}
+			defer resp.Body.Close()
+
+			body, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
+			content := string(body)
+
+			if strings.Contains(content, "uid=") && strings.Contains(content, "gid=") {
+				return fmt.Sprintf("Param: %s | Out: %s", param, truncate(content, 30)), true
+			}
+			if strings.Contains(content, "Linux") || strings.Contains(content, "Windows") {
+				return fmt.Sprintf("Param: %s | Out: %s", param, truncate(content, 30)), true
+			}
+		}
+	}
+	return "", false
+}
+
+func loadPaths(filename string) error {
+	file, err := os.Open(filename)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	var currentSection string
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+
+		if strings.HasPrefix(line, "[") && strings.HasSuffix(line, "]") {
+			currentSection = strings.ToLower(line)
+			continue
+		}
+
+		switch currentSection {
+		case "[wordpress]":
+			pathsWP = append(pathsWP, line)
+		case "[joomla]":
+			pathsJoomla = append(pathsJoomla, line)
+		case "[general]":
+			pathsGeneral = append(pathsGeneral, line)
+		default:
+			pathsGeneral = append(pathsGeneral, line)
+		}
+	}
+	return scanner.Err()
 }
 
 func loadConfig(filename string) {
@@ -471,17 +590,41 @@ func scanDomain(baseURL string, depth int) ScanResult {
 		}
 	}
 
-	if depth < config.MaxDepth && len(result.Findings) == 0 {
+	isOpenDir := false
+	for _, f := range result.Findings {
+		if f.Type == "DIRECTORY_LISTING" {
+			isOpenDir = true
+			break
+		}
+	}
+
+	if isOpenDir && depth < 15 {
+
+		fmt.Printf("\r🚀 Auto-Diving into: %s\n", baseURL)
+
+		subFolders := extractDirectoryLinks(baseURL, content)
+
+		for _, folder := range subFolders {
+			wgScan := &sync.WaitGroup{}
+			wgScan.Add(1)
+
+			go func(urlTarget string) {
+				defer wgScan.Done()
+				childResult := scanDomain(urlTarget, depth+1)
+
+				resultsChan <- childResult
+			}(folder)
+
+			wgScan.Wait()
+		}
+	}
+
+	if !isOpenDir && depth < config.MaxDepth {
 		links := extractLinks(baseURL, content)
 		for _, link := range links {
 			if !isExternalLink(link, baseURL) && !isBlacklisted(link) {
-				if !strings.Contains(link, "?") || depth < 2 {
-					nestedResult := scanDomain(link, depth+1)
-					for _, finding := range nestedResult.Findings {
-						if finding.Severity == "CRITICAL" || finding.Severity == "HIGH" {
-							result.Findings = append(result.Findings, finding)
-						}
-					}
+				if _, visited := visitedURLs.Load(link); !visited {
+					scanDomain(link, depth+1)
 				}
 			}
 		}
@@ -510,14 +653,18 @@ func isExternalLink(link, baseURL string) bool {
 }
 
 func isBlacklisted(link string) bool {
+	link = strings.ToLower(link)
 	blacklist := []string{
 		"logout", "signout", "exit", "logoff",
-		".jpg", ".png", ".gif", ".css", ".js",
+		".jpg", ".png", ".gif", ".css", ".js", ".svg", ".ico", ".woff",
 		".pdf", ".zip", ".rar", ".exe", ".mp4",
+		"xmlrpc.php", "wp-json",
+		"/feed", "/rss", "/atom",
+		"comment-page", "?share=", "?replytocom=",
 	}
 
 	for _, pattern := range blacklist {
-		if strings.Contains(strings.ToLower(link), strings.ToLower(pattern)) {
+		if strings.Contains(link, pattern) {
 			return true
 		}
 	}
@@ -527,87 +674,155 @@ func isBlacklisted(link string) bool {
 func advancedShellScan(baseURL, content, cms string, resp *http.Response) []Finding {
 	var findings []Finding
 
-	allPatterns := wordlist
-	switch cms {
-	case "Joomla":
-		allPatterns = append(allPatterns, joomlaPatterns...)
-	case "WordPress":
-		allPatterns = append(allPatterns, wordpressPatterns...)
+	isIndex := strings.Contains(content, "Index of /") ||
+		strings.Contains(content, "Directory listing for") ||
+		strings.Contains(resp.Header.Get("Title"), "Index of")
+
+	if isIndex {
+		findings = append(findings, Finding{
+			Type:        "DIRECTORY_LISTING",
+			Path:        baseURL,
+			Evidence:    "Index of / detected",
+			Severity:    "HIGH",
+			Description: "Open Directory Listing found",
+		})
 	}
 
-	for _, pattern := range allPatterns {
-		if strings.Contains(content, pattern) {
+	lowerContent := strings.ToLower(content)
+	for _, sig := range shellSignatures {
+		if strings.Contains(lowerContent, strings.ToLower(sig)) {
 			findings = append(findings, Finding{
-				Type:        "SHELL_PATTERN",
+				Type:        "SHELL_SIGNATURE",
 				Path:        baseURL,
-				Evidence:    truncate(pattern, 100),
-				Severity:    getSeverity(pattern),
-				Description: "Found shell pattern in page content",
+				Evidence:    sig,
+				Severity:    "CRITICAL",
+				Description: "Matched known shell signature in body",
 			})
+			break
 		}
 	}
 
 	regexPatterns := []*regexp.Regexp{
-		regexp.MustCompile(`eval\s*\(\s*base64_decode\s*\(`),
-		regexp.MustCompile(`gzinflate\s*\(\s*base64_decode\s*\(`),
-		regexp.MustCompile(`system\s*\(\s*\$_`),
-		regexp.MustCompile(`shell_exec\s*\(`),
-		regexp.MustCompile(`passthru\s*\(`),
-		regexp.MustCompile(`exec\s*\(`),
-		regexp.MustCompile(`assert\s*\(`),
-		regexp.MustCompile(`preg_replace\s*\(.*/e`),
-		regexp.MustCompile(`\x24\x5f\x50\x4f\x53\x54\x5b.*\x5d`),
+		regexp.MustCompile(`(?i)Uid=\d+\(.*\)\s+Gid=\d+\(.*\)`),
+		regexp.MustCompile(`(?i)Microsoft\s+Windows\s+\[Version\s+\d+\.\d+`),
+		regexp.MustCompile(`eval\(\s*base64_decode`),
 	}
 
 	for _, re := range regexPatterns {
 		if matches := re.FindAllString(content, -1); len(matches) > 0 {
-			for _, match := range matches {
-				findings = append(findings, Finding{
-					Type:        "SHELL_REGEX",
-					Path:        baseURL,
-					Evidence:    truncate(match, 100),
-					Severity:    "CRITICAL",
-					Description: "Regex match for shell code",
-				})
-			}
-		}
-	}
-
-	if encoded := findEncodedContent(content); encoded != "" {
-		findings = append(findings, Finding{
-			Type:        "ENCODED_CONTENT",
-			Path:        baseURL,
-			Evidence:    truncate(encoded, 100),
-			Severity:    "HIGH",
-			Description: "Found potentially encoded malicious content",
-		})
-	}
-
-	for header, values := range resp.Header {
-		for _, value := range values {
-			if isSuspiciousHeader(header, value) {
-				findings = append(findings, Finding{
-					Type:        "SUSPICIOUS_HEADER",
-					Path:        baseURL,
-					Evidence:    fmt.Sprintf("%s: %s", header, value),
-					Severity:    "MEDIUM",
-					Description: "Suspicious HTTP header detected",
-				})
-			}
-		}
-	}
-
-	shellPaths := getCommonShellPaths(cms)
-	for _, path := range shellPaths {
-		fullURL := baseURL + path
-		if checkURLExists(fullURL) {
 			findings = append(findings, Finding{
-				Type:        "SHELL_FILE",
-				Path:        path,
-				Evidence:    "File exists",
+				Type:        "SHELL_REGEX",
+				Path:        baseURL,
+				Evidence:    truncate(matches[0], 50),
 				Severity:    "CRITICAL",
-				Description: "Common shell file found",
+				Description: "Regex match for shell code",
 			})
+			break
+		}
+	}
+
+	u, err := url.Parse(baseURL)
+	if err != nil {
+		return findings
+	}
+
+	if strings.HasSuffix(u.Path, ".php") {
+		pathParts := strings.Split(u.Path, "/")
+		if len(pathParts) > 1 {
+			u.Path = strings.Join(pathParts[:len(pathParts)-1], "/")
+		}
+	}
+	if !strings.HasSuffix(u.Path, "/") {
+		u.Path += "/"
+	}
+
+	cleanBaseURL := u.String()
+
+	var targetPaths []string
+	if isIndex {
+		targetPaths = append(targetPaths, "/")
+	} else {
+		dynamicDirs := extractDynamicDirectories(content)
+		targetPaths = append(targetPaths, dynamicDirs...)
+	}
+
+	if len(targetPaths) == 0 {
+		targetPaths = []string{"/"}
+	}
+
+	folderStatus := make(map[string]bool)
+
+	for _, relPath := range targetPaths {
+		folderURL := cleanBaseURL
+		if relPath != "/" {
+			if strings.HasPrefix(relPath, "http") {
+				folderURL = relPath
+			} else {
+				folderURL = strings.TrimRight(cleanBaseURL, "/") + "/" + strings.TrimLeft(relPath, "/")
+			}
+		}
+
+		if isBad, known := folderStatus[folderURL]; known && isBad {
+			continue
+		}
+
+		if _, known := folderStatus[folderURL]; !known {
+			if checkURLExists(strings.TrimRight(folderURL, "/") + "/verify_404_check.php") {
+				folderStatus[folderURL] = true
+				continue
+			} else {
+				folderStatus[folderURL] = false
+			}
+		}
+
+		names := shellFilenames
+		if len(names) == 0 {
+			names = []string{"shell.php", "wso.php", "mini.php"}
+		}
+
+		for _, name := range names {
+			fileURL := strings.TrimRight(folderURL, "/") + "/" + name
+
+			if checkURLExists(fileURL) {
+				findings = append(findings, Finding{
+					Type:        "SHELL_FILE",
+					Path:        fileURL,
+					Evidence:    "File exists (200 OK)",
+					Severity:    "CRITICAL",
+					Description: "Shell found at static location",
+				})
+
+				if stealtRes, isStealth := checkStealthShell(fileURL); isStealth {
+					findings = append(findings, Finding{
+						Type:        "STEALTH_SHELL_EXEC",
+						Path:        fileURL,
+						Evidence:    stealtRes,
+						Severity:    "CRITICAL",
+						Description: "Remote Command Execution confirmed via Fuzzing",
+					})
+				}
+				break
+			}
+
+			if isIndex {
+				mutations := generateMutations(name)
+				for _, mutName := range mutations {
+					if mutName == name {
+						continue
+					}
+					mutURL := strings.TrimRight(folderURL, "/") + "/" + mutName
+					if checkURLExists(mutURL) {
+						findings = append(findings, Finding{
+							Type:        "SHELL_FILE",
+							Path:        mutURL,
+							Evidence:    "File exists (200 OK)",
+							Severity:    "CRITICAL",
+							Description: "Shell found (Mutation)",
+						})
+						break
+					}
+				}
+			}
 		}
 	}
 
@@ -644,31 +859,94 @@ func isSuspiciousHeader(header, value string) bool {
 	return false
 }
 
+func generateMutations(filename string) []string {
+	var mutations []string
+	extIndex := strings.LastIndex(filename, ".")
+	if extIndex == -1 {
+		return []string{filename}
+	}
+
+	name := filename[:extIndex]
+	ext := filename[extIndex:]
+
+	// List variasi yang sering dipakai hacker saat rename shell
+	suffixes := []string{
+		"1", "2", "_v1", "_new", "_bkp", ".bak", ".old", "_seo",
+	}
+
+	mutations = append(mutations, filename) // File asli
+
+	if len(name) <= 6 {
+		for _, s := range suffixes {
+			mutations = append(mutations, name+s+ext)
+		}
+	}
+
+	return mutations
+}
+
+func extractDynamicDirectories(content string) []string {
+	var dirs []string
+	unique := make(map[string]bool)
+
+	re := regexp.MustCompile(`(src|href)=["'](/[^"']*/?)["']`)
+	matches := re.FindAllStringSubmatch(content, -1)
+
+	for _, match := range matches {
+		if len(match) > 2 {
+			fullPath := match[2]
+			lastSlash := strings.LastIndex(fullPath, "/")
+			if lastSlash > 1 {
+				dir := fullPath[:lastSlash+1]
+
+				if len(dir) < 4 || strings.Contains(dir, ".") || strings.Contains(dir, "//") {
+					continue
+				}
+
+				if !unique[dir] {
+					unique[dir] = true
+					dirs = append(dirs, dir)
+				}
+			}
+		}
+	}
+
+	if len(dirs) > 10 {
+		return dirs[:10]
+	}
+	return dirs
+}
+
 func getCommonShellPaths(cms string) []string {
 	var paths []string
 
+	names := shellFilenames
+	if len(names) == 0 {
+		names = []string{"shell.php", "wso.php", "mini.php"}
+	}
+
+	var basePaths []string
+
 	switch cms {
 	case "WordPress":
-		paths = []string{
-			"/wp-content/uploads/shell.php",
-			"/wp-content/uploads/idx.php",
-			"/wp-content/themes/twentyfifteen/404.php",
-			"/wp-config.php.bak",
-			"/wp-admin/admin-ajax.php.bak",
-		}
+		basePaths = append(basePaths, pathsWP...)
+		basePaths = append(basePaths, pathsGeneral...)
+
+		paths = append(paths, "/wp-config.php.bak")
+
 	case "Joomla":
-		paths = []string{
-			"/configuration.php.bak",
-			"/htaccess.txt",
-			"/joomla.xml.bak",
-			"/images/stories/shell.php",
-		}
+		basePaths = append(basePaths, pathsJoomla...)
+		basePaths = append(basePaths, pathsGeneral...)
+
+		paths = append(paths, "/configuration.php.bak")
+
 	default:
-		paths = []string{
-			"/cmd.php", "/wso.php", "/c99.php", "/r57.php",
-			"/shell.php", "/upload.php", "/b374k.php",
-			"/config.php.bak", "/.user.ini",
-			"/mini.php", "/alfa.php",
+		basePaths = pathsGeneral
+	}
+
+	for _, bp := range basePaths {
+		for _, name := range names {
+			paths = append(paths, bp+name)
 		}
 	}
 
@@ -676,11 +954,22 @@ func getCommonShellPaths(cms string) []string {
 }
 
 func checkURLExists(url string) bool {
-	req, err := http.NewRequest("HEAD", url, nil)
+	displayURL := url
+	if len(displayURL) > 60 {
+		displayURL = "..." + displayURL[len(displayURL)-60:]
+	}
+	fmt.Printf("\r🔍 Cek: %-65s", displayURL)
+	// --------------------------------------------------
+
+	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return false
 	}
 	req.Header.Set("User-Agent", config.UserAgent)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	req = req.WithContext(ctx)
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
@@ -688,7 +977,33 @@ func checkURLExists(url string) bool {
 	}
 	defer resp.Body.Close()
 
-	return resp.StatusCode == 200
+	if resp.StatusCode != 200 {
+		return false
+	}
+
+	bodyBytes, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
+	content := strings.ToLower(string(bodyBytes))
+
+	wafKeywords := []string{
+		"please wait",
+		"being verified",
+		"ddos protection",
+		"security check",
+		"cloudflare",
+		"captcha",
+		"attention required",
+		"access denied",
+		"404 not found",
+		"page not found",
+	}
+
+	for _, kw := range wafKeywords {
+		if strings.Contains(content, kw) {
+			return false
+		}
+	}
+
+	return true
 }
 
 func detectCMS(baseURL, content string, resp *http.Response) CMSInfo {
@@ -856,6 +1171,46 @@ func extractLinks(baseURL, content string) []string {
 	return links
 }
 
+func extractDirectoryLinks(baseURL, content string) []string {
+	var links []string
+
+	re := regexp.MustCompile(`href=["']([^"']*/?)["']`)
+	matches := re.FindAllStringSubmatch(content, -1)
+
+	base, err := url.Parse(baseURL)
+	if err != nil {
+		return links
+	}
+
+	for _, match := range matches {
+		if len(match) < 2 {
+			continue
+		}
+		rawLink := match[1]
+
+		if strings.HasPrefix(rawLink, "?") ||
+			strings.HasPrefix(rawLink, "/") ||
+			strings.HasPrefix(rawLink, "http") ||
+			strings.HasPrefix(rawLink, "mailto:") ||
+			rawLink == "../" ||
+			rawLink == "./" {
+			continue
+		}
+
+		if !strings.HasSuffix(rawLink, "/") {
+			continue
+		}
+
+		resolved := base.ResolveReference(&url.URL{Path: rawLink})
+		finalURL := resolved.String()
+
+		if strings.HasPrefix(finalURL, baseURL) && finalURL != baseURL {
+			links = append(links, finalURL)
+		}
+	}
+	return links
+}
+
 func takeScreenshot(url string) string {
 	os.MkdirAll("screenshots", 0755)
 
@@ -973,6 +1328,7 @@ func printResult(result ScanResult) {
 	colorYellow := "\033[33m"
 	colorBlue := "\033[34m"
 	colorPurple := "\033[35m"
+	colorCyan := "\033[36m"
 
 	var statusColor string
 	switch result.Status {
@@ -986,38 +1342,70 @@ func printResult(result ScanResult) {
 		statusColor = colorBlue
 	}
 
-	fmt.Printf("\n%s[%s]%s %s\n", statusColor, result.Status, colorReset, result.URL)
-
-	if len(result.Findings) > 0 {
-		for _, finding := range result.Findings {
-			if finding.Type == "SHELL_FILE" {
-				fmt.Printf("%s%s\n", result.URL, finding.Path)
-			}
+	var shellURLs []string
+	for _, f := range result.Findings {
+		if f.Type == "SHELL_FILE" {
+			shellURLs = append(shellURLs, f.Path)
 		}
 	}
 
+	fmt.Printf("\n%s[%s]%s %s\n", statusColor, result.Status, colorReset, result.URL)
 	fmt.Printf("  CMS: %s %s (%d%%)\n", result.CMS.Name, result.CMS.Version, result.CMS.Certainty)
-	fmt.Printf("  Status Code: %d\n", result.StatusCode)
+
+	if len(shellURLs) > 0 {
+		fmt.Printf("  %s🔥 SHELL FOUND! 🔥%s\n", colorRed, colorReset)
+		for _, url := range shellURLs {
+			fmt.Printf("  >> %s%s%s\n", colorCyan, url, colorReset)
+
+			appendFoundShell(url)
+		}
+	}
 
 	if len(result.Findings) > 0 {
-		fmt.Printf("  Findings (%d):\n", len(result.Findings))
+		countOther := 0
 		for _, finding := range result.Findings {
-			var severityColor string
-			switch finding.Severity {
-			case "CRITICAL":
-				severityColor = colorRed
-			case "HIGH":
-				severityColor = colorPurple
-			case "MEDIUM":
-				severityColor = colorYellow
-			default:
-				severityColor = colorBlue
+			if finding.Type != "SHELL_FILE" {
+				countOther++
 			}
-
-			fmt.Printf("    %s[%s]%s %s: %s (%s)\n",
-				severityColor, finding.Severity, colorReset,
-				finding.Type, truncate(finding.Evidence, 50), finding.Path)
 		}
+
+		if countOther > 0 {
+			fmt.Printf("  Other Findings (%d):\n", countOther)
+			for _, finding := range result.Findings {
+				if finding.Type == "SHELL_FILE" {
+					continue
+				}
+
+				var severityColor string
+				switch finding.Severity {
+				case "CRITICAL":
+					severityColor = colorRed
+				case "HIGH":
+					severityColor = colorPurple
+				case "MEDIUM":
+					severityColor = colorYellow
+				default:
+					severityColor = colorBlue
+				}
+
+				fmt.Printf("    %s[%s]%s %s: %s\n",
+					severityColor, finding.Severity, colorReset,
+					finding.Type, truncate(finding.Evidence, 50))
+			}
+		}
+	}
+}
+
+func appendFoundShell(shellURL string) {
+	f, err := os.OpenFile("found_shells.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		log.Printf("⚠️ Gagal menulis ke found_shells.txt: %v", err)
+		return
+	}
+	defer f.Close()
+
+	if _, err := f.WriteString(shellURL + "\n"); err != nil {
+		log.Printf("⚠️ Gagal menulis baris ke file: %v", err)
 	}
 }
 

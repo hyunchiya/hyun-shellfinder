@@ -1,0 +1,313 @@
+type="password"
+type='password'
+multipart/form-data
+type="file"
+type='file'
+c99shell
+r57shell
+WSO 2.
+b374k
+IndoXploit
+Angel Shell
+Madspot
+Uploader
+WebShell
+Directory listing for
+Index of /
+uid=
+gid=
+/bin/bash
+/bin/sh
+cmd.exe
+Microsoft Windows [Version
+<form method="post"
+pass=
+password=
+<input name="cmd"
+<input name="a"
+<input name="c"
+eval(base64_decode
+gzinflate(base64_decode
+shell_exec
+passthru
+exec(
+error_reporting(0)
+FilesMan
+Mr.Spy
+Symlink
+Bypass
+Safe Mode: OFF
+disable_functions
+c99shell
+r57shell
+WSO 2.
+WSO 3.
+WSO 4.
+b374k
+IndoXploit
+Leaf PHP Mailer
+Angel Shell
+Madspot
+alfa-shell
+Uploader By
+Hacked By
+Owned By
+Defaced By
+Mr.Spy
+Mini Shell
+Webadmin
+PHPJackal
+Symlink
+Zone-H
+bypass shell
+mass deface
+multipart/form-data
+type="password"
+type='password'
+p0wny-shell
+simple-backdoor
+php-reverse-shell
+Cmd (
+Execute Command
+Command Execution
+Safe Mode: OFF
+Disable Functions:
+Software: Apache
+System: Linux
+System: Windows
+uid=
+gid=
+drwxr
+-rw-r
+eval(base64_decode
+gzinflate(base64_decode
+shell_exec
+passthru
+exec_shell
+Joomla! Administration Login
+WordPress > Error
+Whoops! There was an error.
+Parse error: syntax error
+Fatal error:
+Warning: include
+adminer
+db_connect
+sql_connect
+PHP File Manager
+Tiny File Manager
+
+drwxr-xr-x
+Uname:
+Yanz Webshell!
+-rw-r--r--
+type="submit" name="actionUpload">Upload!
+input type="hidden" name="pilihan" value="upload"
+input type="hidden" name="dir" value=
+input type="file" name="uploadFile"
+WIBUHAX0R1337
+<title>Gecko [
+Modified By #No_Identity
+input type="submit" value="upload"
+%PDF- %PDF-
+Function putenv()
+#!*&@#!*&@#
+Lambo [Beta]
+./AlfaTeam
+Hunter Neel
+Gel4y Mini Shell
+{Ninja-Shell}
+type="button">Upload File<
+Simple File Manage Design by index.php
+x3x3x3x_5h3ll
+LIT COUSRE TEAM
+403WebShell
+Indonesian Darknet
+AnonSec Shell
+Powered By Indonesian Darknet
+<title>MARIJUANA</title>
+File manager -
+bondowoso black hat shell
+BlackDragon
+| PHP 7.4.20 |
+xXx Kelelawar Cyber Team xXx
+Code By Kelelawar Cyber Team
+UnknownSec
+shell bypass 403
+UnknownSec Shell
+[ HOME SHELL ]
+RC-SHELL v2.0.2011.1009
+<title>Mini Shell</title>
+Mini Shell
+Negat1ve Shell
+Copyright negat1ve1337
+[+[MAD TIGER]+]
+Franz Private Shell
+Webshell V1.0
+>Cassano Bypass <
+TEAM-0ROOT Uploader
+Fighter Kamrul Plugin
+- FierzaXploit -
+Simple
+Responsive & Powerfull
+<title>FierzaXploit</title>
+Current dir:
+Minishell
+Current directory:
+[ ! ] Cilent Shell Backdor [ ! ]
+Mini Shell By Black_Shadow
+FileManager Version 0.2 by ECWS
+aDriv4-Priv8 TOOL
+B Ge Team File Manager
+MARIJuANA
+ineSec Team Shell
+CHips L Pro sangad
+Doc Root:
+[+] MINI SH3LL BYPASS [+]
+TEAM-0ROOT
+#No_Identity 2.4.3
+[ Mini Shell ]
+PHU Mini Shell
+MSQ_403
+#wp_config_error#
+Graybyt3 Was Here
+One Hat Cyber Team
+Mr.Combet WebShell
+C0d3d By Dr.D3m0
+input name="fnm" type="file"/><input type="submit"
+input type="file" name="uploaded_file"
+input type="file" name="file"><input name="_upl" type="submit" id="_upl" value="Upload"
+input type="file" name="fileToUpload" id="fileToUpload"
+input type="file" name="files[]" id="file-input"
+input type="file" name="file
+input name="message" type="file"
+input name="passw" value=""><input name="dir"
+input class="Input" type="file" name="file_n[]"
+input type="file" name="__"><input name="_" type="submit" value="Upload"
+input type="file" class="input" name="file"
+input name="fnm" type="file"/><input type="submit" value="
+input name="uploadedfile" type="file"/><input type="submit" value="Upload File"
+type="file"><br><input
+input type="file" name="filename"
+input type="file" name="upload"
+input type="submit" name="upload" value="Uploader"
+input type="file" name="image"><input type="Submit" name="Submit" value="Submit"
+input type="file" name="mbdfiles"
+input type="submit" name="upl_files" value="upload"
+input type="file" name="image"
+input type="submit" name="test" value="Upload"
+input type="hidden" name="path" value=
+Upload File : <input type="file" name="file"
+L I E R SHELL
+<pre align=center><form method=post>Password<br><input type=password name=pass
+type=password name=pass
+>Password<br><input
+input type="submit" value=">>"
+%PDF- %PDF-0-1<form action="" method="post"><input type="text" name="_rg"><input type="submit" value=">>"
+Leaf PHPMailer
+drwxr-xr-x
+Uname:
+Yanz Webshell!
+-rw-r--r--
+WIBUHAX0R1337
+<title>Gecko [
+Modified By #No_Identity
+Function putenv()
+#!*&@#!*&@#
+Lambo [Beta]
+./AlfaTeam
+Hunter Neel
+L I E R SHELL
+Gel4y Mini Shell
+{Ninja-Shell}
+type="button">Upload File<
+Simple File Manage Design by index.php
+x3x3x3x_5h3ll
+LIT COUSRE TEAM
+403WebShell
+Indonesian Darknet
+AnonSec Shell
+Powered By Indonesian Darknet
+<title>MARIJUANA</title>
+File manager -
+bondowoso black hat shell
+BlackDragon
+xXx Kelelawar Cyber Team xXx
+Code By Kelelawar Cyber Team
+UnknownSec
+shell bypass 403
+UnknownSec Shell
+[ HOME SHELL ]
+RC-SHELL v2.0.2011.1009
+<title>Mini Shell</title>
+Mini Shell
+Negat1ve Shell
+Copyright negat1ve1337
+[+[MAD TIGER]+]
+Franz Private Shell
+Webshell V1.0
+>Cassano Bypass <
+TEAM-0ROOT Uploader
+Fighter Kamrul Plugin
+- FierzaXploit -
+Simple
+Responsive & Powerfull
+<title>FierzaXploit</title>
+Current dir:
+Minishell
+Current directory:
+[ ! ] Cilent Shell Backdor [ ! ]
+Mini Shell By Black_Shadow
+FileManager Version 0.2 by ECWS
+aDriv4-Priv8 TOOL
+B Ge Team File Manager
+MARIJuANA
+ineSec Team Shell
+CHips L Pro sangad
+Doc Root:
+[+] MINI SH3LL BYPASS [+]
+TEAM-0ROOT
+#No_Identity 2.4.3
+[ Mini Shell ]
+PHU Mini Shell
+MSQ_403
+#wp_config_error#
+Graybyt3 Was Here
+One Hat Cyber Team
+Mr.Combet WebShell
+C0d3d By Dr.D3m0
+Zerion Mini Shell
+<pre align=center><form method=post>Password<br><input type=password name=pass
+type=password name=pass
+>Password<br><input
+input type="submit" value=">>"
+%PDF- %PDF-0-1<form action="" method="post"><input type="text" name="_rg"><input type="submit" value=">>"
+input name="fnm" type="file"/><input type="submit"
+type="submit" name="actionUpload">Upload!
+input type="hidden" name="pilihan" value="upload"
+input type="hidden" name="dir" value=
+input type="file" name="uploadFile"
+input type="submit" value="upload"
+%PDF- %PDF-
+input type="file" name="file"><input name="_upl" type="submit" id="_upl" value="Upload"
+input type="file" name="fileToUpload" id="fileToUpload"
+input type="file" name="files[]" id="file-input"
+input type="file" name="file
+input name="message" type="file"
+input name="passw" value=""><input name="dir"
+input class="Input" type="file" name="file_n[]"
+input type="file" name="__"><input name="_" type="submit" value="Upload"
+input type="file" class="input" name="file"
+input name="fnm" type="file"/><input type="submit" value="
+input name="uploadedfile" type="file"/><input type="submit" value="Upload File"
+type="file"><br><input
+input type="file" name="filename"
+input type="file" name="upload"
+input type="submit" name="upload" value="Uploader"
+input type="file" name="image"><input type="Submit" name="Submit" value="Submit"
+input type="file" name="mbdfiles"
+input type="submit" name="upl_files" value="upload"
+input type="file" name="image"
+input type="submit" name="test" value="Upload"
+input type="hidden" name="path" value=
+Upload File : <input type="file" name="file"
+Leaf PHPMailer

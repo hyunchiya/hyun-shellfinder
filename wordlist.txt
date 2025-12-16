@@ -1,8 +1,3 @@
-# ShellFinder Wordlist
-# Common shell patterns and backdoors
-
-gacor
-maxwin
 child_stdin, child_stdout = os.popen2(base64.b64decode(cmd))
 gzinflate(base64_decode(
 <!--#exec cmd=

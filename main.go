@@ -24,7 +24,6 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-// Config struktur
 type Config struct {
 	Threads         int      `json:"threads"`
 	Timeout         int      `json:"timeout"`
@@ -97,7 +96,6 @@ var (
 )
 
 func main() {
-	// Parse flags
 	var (
 		domainFile   = flag.String("f", "list.txt", "File berisi list domain")
 		outputFile   = flag.String("o", "results.json", "Output file")
@@ -112,10 +110,8 @@ func main() {
 	)
 	flag.Parse()
 
-	// Load config
 	loadConfig(*configFile)
 
-	// Override with flags
 	if *proxy != "" {
 		config.ProxyURL = *proxy
 	}
@@ -135,13 +131,10 @@ func main() {
 
 	printBanner()
 
-	// Load wordlists
 	loadWordlists()
 
-	// Initialize HTTP client with proxy support
 	initHTTPClient(*rateLimit)
 
-	// Read domains
 	domains, err := readDomains(*domainFile)
 	if err != nil {
 		log.Fatalf("Error reading domains: %v", err)
@@ -156,12 +149,10 @@ func main() {
 	fmt.Printf("📝 Wordlist patterns: %d\n", len(wordlist)+len(joomlaPatterns)+len(wordpressPatterns))
 	fmt.Println("============================================================")
 
-	// Start scanner
 	var wg sync.WaitGroup
 	semaphore := make(chan struct{}, config.Threads)
 	startTime := time.Now()
 
-	// Progress tracker
 	go func() {
 		ticker := time.NewTicker(5 * time.Second)
 		defer ticker.Stop()
@@ -174,10 +165,9 @@ func main() {
 		}
 	}()
 
-	// Process results
-	go processResults(*outputFile)
+	done := make(chan bool)
+	go processResults(*outputFile, done)
 
-	// Scan domains
 	for _, domain := range domains {
 		wg.Add(1)
 		go func(d string) {
@@ -195,6 +185,8 @@ func main() {
 
 	wg.Wait()
 	close(resultsChan)
+
+	<-done
 
 	if config.SaveToDB {
 		generateReports(startTime, len(domains))
@@ -238,10 +230,7 @@ func loadWordlists() {
 		}
 	}
 
-	// Add your custom patterns
 	customPatterns := []string{
-		"gacor",
-		"maxwin",
 		"child_stdin, child_stdout = os.popen2(base64.b64decode(cmd))",
 		"gzinflate(base64_decode(",
 		"<!--#exec cmd=",
@@ -428,7 +417,6 @@ func scanDomain(baseURL string, depth int) ScanResult {
 		Status:    "STARTED",
 	}
 
-	// Make request
 	req, err := http.NewRequest("GET", baseURL, nil)
 	if err != nil {
 		result.Status = "ERROR"
@@ -440,7 +428,6 @@ func scanDomain(baseURL string, depth int) ScanResult {
 		return result
 	}
 
-	// Set headers
 	req.Header.Set("User-Agent", config.UserAgent)
 	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8")
 	req.Header.Set("Accept-Language", "en-US,en;q=0.9")
@@ -451,7 +438,6 @@ func scanDomain(baseURL string, depth int) ScanResult {
 		req.Header.Set(header.Name, header.Value)
 	}
 
-	// Execute request
 	resp, err := httpClient.Do(req)
 	if err != nil {
 		result.Status = "ERROR"
@@ -464,33 +450,27 @@ func scanDomain(baseURL string, depth int) ScanResult {
 	}
 	defer resp.Body.Close()
 
-	// Read response
 	body, _ := io.ReadAll(resp.Body)
 	content := string(body)
 	result.StatusCode = resp.StatusCode
 	result.Headers = resp.Header
 	result.Status = "SCANNED"
 
-	// Get page title
 	if titleMatch := regexp.MustCompile(`<title>(.*?)</title>`).FindStringSubmatch(content); len(titleMatch) > 1 {
 		result.Title = titleMatch[1]
 	}
 
-	// Detect CMS and technologies
 	result.CMS = detectCMS(baseURL, content, resp)
 	result.Technologies = detectTechnologies(content, resp)
 
-	// Advanced shell scanning
 	result.Findings = advancedShellScan(baseURL, content, result.CMS.Name, resp)
 
-	// Take screenshot if enabled
 	if config.TakeScreenshots && depth == 0 && result.StatusCode == 200 {
 		if screenshotPath := takeScreenshot(baseURL); screenshotPath != "" {
 			result.Screenshot = screenshotPath
 		}
 	}
 
-	// Recursive scanning
 	if depth < config.MaxDepth && len(result.Findings) == 0 {
 		links := extractLinks(baseURL, content)
 		for _, link := range links {
@@ -507,7 +487,6 @@ func scanDomain(baseURL string, depth int) ScanResult {
 		}
 	}
 
-	// Categorize status
 	if len(result.Findings) > 0 {
 		result.Status = "VULNERABLE"
 	} else if result.StatusCode >= 400 {
@@ -548,7 +527,6 @@ func isBlacklisted(link string) bool {
 func advancedShellScan(baseURL, content, cms string, resp *http.Response) []Finding {
 	var findings []Finding
 
-	// Combine all patterns
 	allPatterns := wordlist
 	switch cms {
 	case "Joomla":
@@ -557,7 +535,6 @@ func advancedShellScan(baseURL, content, cms string, resp *http.Response) []Find
 		allPatterns = append(allPatterns, wordpressPatterns...)
 	}
 
-	// Check string patterns
 	for _, pattern := range allPatterns {
 		if strings.Contains(content, pattern) {
 			findings = append(findings, Finding{
@@ -570,7 +547,6 @@ func advancedShellScan(baseURL, content, cms string, resp *http.Response) []Find
 		}
 	}
 
-	// Check regex patterns
 	regexPatterns := []*regexp.Regexp{
 		regexp.MustCompile(`eval\s*\(\s*base64_decode\s*\(`),
 		regexp.MustCompile(`gzinflate\s*\(\s*base64_decode\s*\(`),
@@ -580,7 +556,6 @@ func advancedShellScan(baseURL, content, cms string, resp *http.Response) []Find
 		regexp.MustCompile(`exec\s*\(`),
 		regexp.MustCompile(`assert\s*\(`),
 		regexp.MustCompile(`preg_replace\s*\(.*/e`),
-		regexp.MustCompile(`\x28\x29\x7b\x28.*\x7d`),
 		regexp.MustCompile(`\x24\x5f\x50\x4f\x53\x54\x5b.*\x5d`),
 	}
 
@@ -598,7 +573,6 @@ func advancedShellScan(baseURL, content, cms string, resp *http.Response) []Find
 		}
 	}
 
-	// Check for encoded content
 	if encoded := findEncodedContent(content); encoded != "" {
 		findings = append(findings, Finding{
 			Type:        "ENCODED_CONTENT",
@@ -609,7 +583,6 @@ func advancedShellScan(baseURL, content, cms string, resp *http.Response) []Find
 		})
 	}
 
-	// Check suspicious headers
 	for header, values := range resp.Header {
 		for _, value := range values {
 			if isSuspiciousHeader(header, value) {
@@ -624,7 +597,6 @@ func advancedShellScan(baseURL, content, cms string, resp *http.Response) []Find
 		}
 	}
 
-	// Check common shell paths
 	shellPaths := getCommonShellPaths(cms)
 	for _, path := range shellPaths {
 		fullURL := baseURL + path
@@ -643,14 +615,12 @@ func advancedShellScan(baseURL, content, cms string, resp *http.Response) []Find
 }
 
 func findEncodedContent(content string) string {
-	// Look for base64 encoded strings longer than 100 chars
 	re := regexp.MustCompile(`base64_decode\(['"]([A-Za-z0-9+/=]{100,})['"]\)`)
 	matches := re.FindStringSubmatch(content)
 	if len(matches) > 1 {
 		return matches[1]
 	}
 
-	// Look for hex encoded strings
 	re = regexp.MustCompile(`\\x[0-9a-fA-F]{2,}`)
 	if matches := re.FindAllString(content, 5); len(matches) > 0 {
 		return strings.Join(matches, " ")
@@ -660,24 +630,9 @@ func findEncodedContent(content string) string {
 }
 
 func isSuspiciousHeader(header, value string) bool {
-	suspiciousHeaders := map[string][]string{
-		"X-Powered-By": {"PHP", "ASP.NET", "JSP"},
-		"Server":       {"nginx", "apache", "IIS"},
-	}
-
-	for h, patterns := range suspiciousHeaders {
-		if strings.EqualFold(header, h) {
-			for _, pattern := range patterns {
-				if strings.Contains(strings.ToLower(value), strings.ToLower(pattern)) {
-					return true
-				}
-			}
-		}
-	}
-
-	// Check for unusual headers
 	unusualHeaders := []string{
 		"X-Backdoor", "X-Shell", "X-Cmd", "X-Eval",
+		"X-Hacker", "X-Pwned",
 	}
 
 	for _, unusual := range unusualHeaders {
@@ -695,32 +650,25 @@ func getCommonShellPaths(cms string) []string {
 	switch cms {
 	case "WordPress":
 		paths = []string{
-			"/wp-content/themes/twentyfifteen/404.php",
 			"/wp-content/uploads/shell.php",
-			"/wp-content/plugins/hello.php",
-			"/wp-includes/js/jquery/jquery.js?cmd=",
+			"/wp-content/uploads/idx.php",
+			"/wp-content/themes/twentyfifteen/404.php",
 			"/wp-config.php.bak",
-			"/wp-admin/admin-ajax.php",
-			"/xmlrpc.php",
-			"/wp-login.php",
+			"/wp-admin/admin-ajax.php.bak",
 		}
 	case "Joomla":
 		paths = []string{
-			"/components/com_wrapper/wrapper.php",
-			"/modules/mod_wrapper/wrapper.php",
-			"/templates/beez/index.php",
-			"/administrator/components/com_admin/admin.php",
-			"/plugins/system/plugin.php",
 			"/configuration.php.bak",
 			"/htaccess.txt",
-			"/joomla.xml",
+			"/joomla.xml.bak",
+			"/images/stories/shell.php",
 		}
 	default:
 		paths = []string{
 			"/cmd.php", "/wso.php", "/c99.php", "/r57.php",
 			"/shell.php", "/upload.php", "/b374k.php",
-			"/config.php.bak", "/.htaccess", "/.user.ini",
-			"/test.php", "/info.php", "/phpinfo.php",
+			"/config.php.bak", "/.user.ini",
+			"/mini.php", "/alfa.php",
 		}
 	}
 
@@ -940,24 +888,23 @@ func takeScreenshot(url string) string {
 	return filename
 }
 
-func processResults(outputFile string) {
+func processResults(outputFile string, done chan bool) {
 	var results []ScanResult
 
 	for result := range resultsChan {
 		if config.SaveToDB {
 			saveToDatabase(result)
 		}
-
 		if config.APIEndpoint != "" {
 			sendToAPI(result)
 		}
-
 		printResult(result)
-
 		results = append(results, result)
 	}
 
 	saveToJSON(outputFile, results)
+
+	done <- true
 }
 
 func saveToDatabase(result ScanResult) {
@@ -1040,6 +987,15 @@ func printResult(result ScanResult) {
 	}
 
 	fmt.Printf("\n%s[%s]%s %s\n", statusColor, result.Status, colorReset, result.URL)
+
+	if len(result.Findings) > 0 {
+		for _, finding := range result.Findings {
+			if finding.Type == "SHELL_FILE" {
+				fmt.Printf("%s%s\n", result.URL, finding.Path)
+			}
+		}
+	}
+
 	fmt.Printf("  CMS: %s %s (%d%%)\n", result.CMS.Name, result.CMS.Version, result.CMS.Certainty)
 	fmt.Printf("  Status Code: %d\n", result.StatusCode)
 
@@ -1057,9 +1013,10 @@ func printResult(result ScanResult) {
 			default:
 				severityColor = colorBlue
 			}
-			fmt.Printf("    %s[%s]%s %s: %s\n",
+
+			fmt.Printf("    %s[%s]%s %s: %s (%s)\n",
 				severityColor, finding.Severity, colorReset,
-				finding.Type, truncate(finding.Evidence, 50))
+				finding.Type, truncate(finding.Evidence, 50), finding.Path)
 		}
 	}
 }

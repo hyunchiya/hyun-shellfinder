@@ -1,6 +1,6 @@
 === SHELLFINDER SCAN SUMMARY ===
-Scan Date: 2025-12-16 00:35:53
-Duration: 2m26.0599753s
+Scan Date: 2025-12-16 16:30:32
+Duration: 22m43.2238663s
 Total Domains: 53
 Completed: 53
 
